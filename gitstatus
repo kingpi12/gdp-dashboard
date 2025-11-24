@@ -1,0 +1,1094 @@
+[1mdiff --git a/requirements.txt b/requirements.txt[m
+[1mindex a930bdb..9f0de5b 100644[m
+[1m--- a/requirements.txt[m
+[1m+++ b/requirements.txt[m
+[36m@@ -1,2 +1,5 @@[m
+[31m-streamlit[m
+[31m-pandas[m
+[32m+[m[32mstreamlit==1.28.0[m
+[32m+[m[32mpandas==2.1.0[m
+[32m+[m[32mplotly==5.15.0[m
+[32m+[m[32mopenpyxl==3.1.0[m
+[32m+[m[32mnumpy==1.24.0[m
+\ No newline at end of file[m
+[1mdiff --git a/streamlit_app.py b/streamlit_app.py[m
+[1mindex c2b31bc..6db94a2 100644[m
+[1m--- a/streamlit_app.py[m
+[1m+++ b/streamlit_app.py[m
+[36m@@ -1,151 +1,927 @@[m
+ import streamlit as st[m
+ import pandas as pd[m
+[31m-import math[m
+[31m-from pathlib import Path[m
+[31m-[m
+[31m-# Set the title and favicon that appear in the Browser's tab bar.[m
+[31m-st.set_page_config([m
+[31m-    page_title='GDP dashboard',[m
+[31m-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.[m
+[31m-)[m
+[31m-[m
+[31m-# -----------------------------------------------------------------------------[m
+[31m-# Declare some useful functions.[m
+[31m-[m
+[31m-@st.cache_data[m
+[31m-def get_gdp_data():[m
+[31m-    """Grab GDP data from a CSV file.[m
+[31m-[m
+[31m-    This uses caching to avoid having to read the file every time. If we were[m
+[31m-    reading from an HTTP endpoint instead of a file, it's a good idea to set[m
+[31m-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')[m
+[31m-    """[m
+[31m-[m
+[31m-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.[m
+[31m-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'[m
+[31m-    raw_gdp_df = pd.read_csv(DATA_FILENAME)[m
+[31m-[m
+[31m-    MIN_YEAR = 1960[m
+[31m-    MAX_YEAR = 2022[m
+[31m-[m
+[31m-    # The data above has columns like:[m
+[31m-    # - Country Name[m
+[31m-    # - Country Code[m
+[31m-    # - [Stuff I don't care about][m
+[31m-    # - GDP for 1960[m
+[31m-    # - GDP for 1961[m
+[31m-    # - GDP for 1962[m
+[31m-    # - ...[m
+[31m-    # - GDP for 2022[m
+[31m-    #[m
+[31m-    # ...but I want this instead:[m
+[31m-    # - Country Name[m
+[31m-    # - Country Code[m
+[31m-    # - Year[m
+[31m-    # - GDP[m
+[31m-    #[m
+[31m-    # So let's pivot all those year-columns into two: Year and GDP[m
+[31m-    gdp_df = raw_gdp_df.melt([m
+[31m-        ['Country Code'],[m
+[31m-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],[m
+[31m-        'Year',[m
+[31m-        'GDP',[m
+[31m-    )[m
+[31m-[m
+[31m-    # Convert years from string to integers[m
+[31m-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])[m
+[31m-[m
+[31m-    return gdp_df[m
+[31m-[m
+[31m-gdp_df = get_gdp_data()[m
+[31m-[m
+[31m-# -----------------------------------------------------------------------------[m
+[31m-# Draw the actual page[m
+[31m-[m
+[31m-# Set the title that appears at the top of the page.[m
+[31m-'''[m
+[31m-# :earth_americas: GDP dashboard[m
+[31m-[m
+[31m-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll[m
+[31m-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.[m
+[31m-But it's otherwise a great (and did I mention _free_?) source of data.[m
+[31m-'''[m
+[31m-[m
+[31m-# Add some spacing[m
+[31m-''[m
+[31m-''[m
+[31m-[m
+[31m-min_value = gdp_df['Year'].min()[m
+[31m-max_value = gdp_df['Year'].max()[m
+[31m-[m
+[31m-from_year, to_year = st.slider([m
+[31m-    'Which years are you interested in?',[m
+[31m-    min_value=min_value,[m
+[31m-    max_value=max_value,[m
+[31m-    value=[min_value, max_value])[m
+[31m-[m
+[31m-countries = gdp_df['Country Code'].unique()[m
+[31m-[m
+[31m-if not len(countries):[m
+[31m-    st.warning("Select at least one country")[m
+[31m-[m
+[31m-selected_countries = st.multiselect([m
+[31m-    'Which countries would you like to view?',[m
+[31m-    countries,[m
+[31m-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])[m
+[31m-[m
+[31m-''[m
+[31m-''[m
+[31m-''[m
+[31m-[m
+[31m-# Filter the data[m
+[31m-filtered_gdp_df = gdp_df[[m
+[31m-    (gdp_df['Country Code'].isin(selected_countries))[m
+[31m-    & (gdp_df['Year'] <= to_year)[m
+[31m-    & (from_year <= gdp_df['Year'])[m
+[31m-][m
+[31m-[m
+[31m-st.header('GDP over time', divider='gray')[m
+[31m-[m
+[31m-''[m
+[31m-[m
+[31m-st.line_chart([m
+[31m-    filtered_gdp_df,[m
+[31m-    x='Year',[m
+[31m-    y='GDP',[m
+[31m-    color='Country Code',[m
+[31m-)[m
+[31m-[m
+[31m-''[m
+[31m-''[m
+[31m-[m
+[31m-[m
+[31m-first_year = gdp_df[gdp_df['Year'] == from_year][m
+[31m-last_year = gdp_df[gdp_df['Year'] == to_year][m
+[31m-[m
+[31m-st.header(f'GDP in {to_year}', divider='gray')[m
+[31m-[m
+[31m-''[m
+[31m-[m
+[31m-cols = st.columns(4)[m
+[31m-[m
+[31m-for i, country in enumerate(selected_countries):[m
+[31m-    col = cols[i % len(cols)][m
+[31m-[m
+[31m-    with col:[m
+[31m-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000[m
+[31m-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000[m
+[31m-[m
+[31m-        if math.isnan(first_gdp):[m
+[31m-            growth = 'n/a'[m
+[31m-            delta_color = 'off'[m
+[32m+[m[32mimport numpy as np[m
+[32m+[m[32mfrom datetime import datetime[m
+[32m+[m[32mimport io[m
+[32m+[m[32mimport re[m
+[32m+[m
+[32m+[m[32m# Настройка страницы[m
+[32m+[m[32mst.set_page_config(page_title="Анализ пожаров", page_icon="🔥", layout="wide")[m
+[32m+[m
+[32m+[m[32m# Пробуем импортировать все необходимые библиотеки[m
+[32m+[m[32mtry:[m
+[32m+[m[32m    import plotly.express as px[m
+[32m+[m[32m    import plotly.graph_objects as go[m
+[32m+[m[32m    PLOTLY_AVAILABLE = True[m
+[32m+[m[32mexcept ImportError:[m
+[32m+[m[32m    PLOTLY_AVAILABLE = False[m
+[32m+[m[32m    st.warning("Plotly не установлен. Установите: pip install plotly")[m
+[32m+[m
+[32m+[m[32mtry:[m
+[32m+[m[32m    import openpyxl[m
+[32m+[m[32m    OPENPYXL_AVAILABLE = True[m
+[32m+[m[32mexcept ImportError:[m
+[32m+[m[32m    OPENPYXL_AVAILABLE = False[m
+[32m+[m[32m    st.warning("Openpyxl не установлен. Установите: pip install openpyxl")[m
+[32m+[m
+[32m+[m[32m# Функции для создания графиков[m
+[32m+[m[32mdef create_chart(data, chart_type='line', **kwargs):[m
+[32m+[m[32m    """Умный создатель графиков с fallback"""[m
+[32m+[m[32m    if PLOTLY_AVAILABLE and not data.empty:[m
+[32m+[m[32m        return create_plotly_chart(data, chart_type, **kwargs)[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        return create_simple_chart(data, chart_type, **kwargs)[m
+[32m+[m
+[32m+[m[32mdef create_plotly_chart(data, chart_type, **kwargs):[m
+[32m+[m[32m    """Создание Plotly графиков"""[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        if chart_type == 'line' and not data.empty:[m
+[32m+[m[32m            fig = px.line(data, x=kwargs.get('x'), y=kwargs.get('y'),[m[41m [m
+[32m+[m[32m                         title=kwargs.get('title'), template='plotly_white')[m
+[32m+[m[32m            fig.update_layout(xaxis_title=kwargs.get('x'), yaxis_title=kwargs.get('y'))[m
+[32m+[m[32m            return st.plotly_chart(fig, use_container_width=True)[m
+[32m+[m[41m        [m
+[32m+[m[32m        elif chart_type == 'bar' and not data.empty:[m
+[32m+[m[32m            fig = px.bar(data, x=kwargs.get('x'), y=kwargs.get('y'),[m
+[32m+[m[32m                        title=kwargs.get('title'), orientation=kwargs.get('orientation'),[m
+[32m+[m[32m                        template='plotly_white')[m
+[32m+[m[32m            return st.plotly_chart(fig, use_container_width=True)[m
+[32m+[m[41m        [m
+[32m+[m[32m        elif chart_type == 'pie' and not data.empty:[m
+[32m+[m[32m            fig = px.pie(data, names=kwargs.get('names'), values=kwargs.get('values'),[m
+[32m+[m[32m                        title=kwargs.get('title'))[m
+[32m+[m[32m            return st.plotly_chart(fig, use_container_width=True)[m
+[32m+[m[41m            [m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        st.error(f"Ошибка создания графика: {e}")[m
+[32m+[m[32m        return create_simple_chart(data, chart_type, **kwargs)[m
+[32m+[m
+[32m+[m[32mdef create_simple_chart(data, chart_type, **kwargs):[m
+[32m+[m[32m    """Создание простых графиков или таблиц"""[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        if chart_type == 'line' and not data.empty and kwargs.get('y') in data.columns:[m
+[32m+[m[32m            st.line_chart(data[kwargs.get('y')])[m
+[32m+[m[32m        elif chart_type == 'bar' and not data.empty and kwargs.get('y') in data.columns:[m
+[32m+[m[32m            st.bar_chart(data[kwargs.get('y')])[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            st.dataframe(data)[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        st.error(f"Ошибка простого графика: {e}")[m
+[32m+[m[32m        st.dataframe(data)[m
+[32m+[m
+[32m+[m[32m# Функция для загрузки и обработки данных[m
+[32m+[m[32mdef load_data(uploaded_file):[m
+[32m+[m[32m    """Загрузка данных из Excel файла"""[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        if OPENPYXL_AVAILABLE:[m
+[32m+[m[32m            df = pd.read_excel(uploaded_file, engine='openpyxl')[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            df = pd.read_excel(uploaded_file)[m
+[32m+[m[41m        [m
+[32m+[m[32m        # Предобработка данных[m
+[32m+[m[32m        df = preprocess_data(df)[m
+[32m+[m[32m        return df[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        st.error(f"Ошибка загрузки данных: {e}")[m
+[32m+[m[32m        return None[m
+[32m+[m
+[32m+[m[32mdef preprocess_data(df):[m
+[32m+[m[32m    """Предобработка данных с вашей структурой"""[m
+[32m+[m[32m    # Приводим названия колонок к нижнему регистру для удобства[m
+[32m+[m[32m    df.columns = df.columns.str.lower().str.strip()[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Создаем копию для безопасной работы[m
+[32m+[m[32m    df_processed = df.copy()[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Создаем колонку с количеством пожаров (каждая строка = 1 пожар)[m
+[32m+[m[32m    df_processed['количество_пожаров'] = 1[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Обработка даты[m
+[32m+[m[32m    date_columns = ['дата возникновения', 'дата'][m
+[32m+[m[32m    date_column = None[m
+[32m+[m[32m    for col in date_columns:[m
+[32m+[m[32m        if col in df_processed.columns:[m
+[32m+[m[32m            date_column = col[m
+[32m+[m[32m            break[m
+[32m+[m[41m    [m
+[32m+[m[32m    if date_column:[m
+[32m+[m[32m        df_processed['дата'] = pd.to_datetime(df_processed[date_column], errors='coerce')[m
+[32m+[m[32m        df_processed['год'] = df_processed['дата'].dt.year[m
+[32m+[m[32m        df_processed['месяц'] = df_processed['дата'].dt.month[m
+[32m+[m[32m        df_processed['месяц_название'] = df_processed['дата'].dt.month_name()[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        # Если даты нет, создаем фиктивные год и месяц[m
+[32m+[m[32m        df_processed['год'] = 2023[m
+[32m+[m[32m        df_processed['месяц'] = 1[m
+[32m+[m[32m        df_processed['месяц_название'] = 'Январь'[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Переименовываем основные колонки если они есть[m
+[32m+[m[32m    column_mapping = {[m
+[32m+[m[32m        'муниципальный район': 'район',[m
+[32m+[m[32m        'населенный пункт': 'населенный_пункт',[m[41m [m
+[32m+[m[32m        'улица': 'улица',[m
+[32m+[m[32m        'дом': 'дом',[m
+[32m+[m[32m        'геоточка': 'геоточка',[m
+[32m+[m[32m        'объединенный адрес': 'адрес',[m
+[32m+[m[32m        'объект пожара (загорания)': 'объект',[m
+[32m+[m[32m        'объект пожара': 'объект',[m
+[32m+[m[32m        'причина пожара': 'причина',[m
+[32m+[m[32m        'погибло людей: всего': 'погибло',[m
+[32m+[m[32m        'в  т.ч. погибло детей': 'погибло_детей',[m[41m [m
+[32m+[m[32m        'получили травмы: всего': 'травмы',[m
+[32m+[m[32m        'в  т.ч. получили травмы: детей': 'травмы_детей',[m
+[32m+[m[32m        'спасено на пожаре людей': 'спасено',[m
+[32m+[m[32m        'эвакуировано на пожаре людей': 'эвакуировано'[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    for old_col, new_col in column_mapping.items():[m
+[32m+[m[32m        if old_col in df_processed.columns and new_col not in df_processed.columns:[m
+[32m+[m[32m            df_processed[new_col] = df_processed[old_col][m
+[32m+[m[41m    [m
+[32m+[m[32m    # УЛУЧШЕННАЯ ОБРАБОТКА ЧИСЛОВЫХ ДАННЫХ[m
+[32m+[m[32m    df_processed = process_numeric_data(df_processed)[m
+[32m+[m[41m    [m
+[32m+[m[32m    # ОБРАБОТКА ГЕОДАННЫХ[m
+[32m+[m[32m    df_processed = process_geodata(df_processed)[m
+[32m+[m[41m    [m
+[32m+[m[32m    # УЛУЧШЕННАЯ ОБРАБОТКА ПРИЧИН[m
+[32m+[m[32m    df_processed = improve_cause_analysis(df_processed)[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Заполняем пропуски в текстовых колонках[m
+[32m+[m[32m    text_columns = ['район', 'объект', 'причина', 'населенный_пункт'][m
+[32m+[m[32m    for col in text_columns:[m
+[32m+[m[32m        if col in df_processed.columns:[m
+[32m+[m[32m            df_processed[col] = df_processed[col].fillna('Не указано')[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            df_processed[col] = 'Не указано'[m
+[32m+[m[41m    [m
+[32m+[m[32m    return df_processed[m
+[32m+[m
+[32m+[m[32mdef process_numeric_data(df):[m
+[32m+[m[32m    """Улучшенная обработка числовых данных с объединением взрослых и детей"""[m
+[32m+[m[32m    # Список числовых колонок для обработки[m
+[32m+[m[32m    numeric_columns = [[m
+[32m+[m[32m        'погибло', 'травмы', 'погибло_детей', 'травмы_детей',[m[41m [m
+[32m+[m[32m        'спасено', 'эвакуировано'[m
+[32m+[m[32m    ][m
+[32m+[m[41m    [m
+[32m+[m[32m    st.sidebar.write("**Обработка числовых данных:**")[m
+[32m+[m[41m    [m
+[32m+[m[32m    for col in numeric_columns:[m
+[32m+[m[32m        if col in df.columns:[m
+[32m+[m[32m            # Обрабатываем данные[m
+[32m+[m[32m            df[col] = df[col].replace(['', ' ', '  ', None, 'None', 'NaN', 'nan'], 0)[m
+[32m+[m[32m            df[col] = df[col].astype(str).str.replace(',', '.')[m
+[32m+[m[32m            df[col] = df[col].astype(str).str.strip()[m
+[32m+[m[32m            df[col] = pd.to_numeric(df[col], errors='coerce')[m
+[32m+[m[32m            df[col] = df[col].fillna(0)[m
+[32m+[m[32m            df[col] = df[col].astype(int)[m
+[32m+[m[41m            [m
+[32m+[m[32m            non_zero = (df[col] > 0).sum()[m
+[32m+[m[32m            st.sidebar.write(f"{col} > 0: {non_zero} записей")[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            df[col] = 0[m
+[32m+[m[32m            st.sidebar.write(f"{col}: колонка не найдена")[m
+[32m+[m[41m    [m
+[32m+[m[32m    # ОБЪЕДИНЯЕМ ДАННЫЕ О ВЗРОСЛЫХ И ДЕТЯХ[m
+[32m+[m[32m    df['всего_погибло'] = df['погибло'] + df['погибло_детей'][m
+[32m+[m[32m    df['всего_травмы'] = df['травмы'] + df['травмы_детей'][m
+[32m+[m[41m    [m
+[32m+[m[32m    # Показываем итоговую статистику[m
+[32m+[m[32m    total_deaths = df['всего_погибло'].sum()[m
+[32m+[m[32m    total_injuries = df['всего_травмы'].sum()[m
+[32m+[m[32m    child_deaths = df['погибло_детей'].sum()[m
+[32m+[m[32m    child_injuries = df['травмы_детей'].sum()[m
+[32m+[m[41m    [m
+[32m+[m[32m    st.sidebar.success(f"Итого - Погибших: {total_deaths} (детей: {child_deaths})")[m
+[32m+[m[32m    st.sidebar.success(f"Итого - Пострадавших: {total_injuries} (детей: {child_injuries})")[m
+[32m+[m[41m    [m
+[32m+[m[32m    return df[m
+[32m+[m
+[32m+[m[32mdef process_geodata(df):[m
+[32m+[m[32m    """Обработка геоданных с правильной проверкой координат"""[m
+[32m+[m[32m    # Проверяем наличие геоточек[m
+[32m+[m[32m    if 'геоточка' in df.columns:[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            # Разделяем геоточку на два числа[m
+[32m+[m[32m            coords = df['геоточка'].astype(str).str.split(' ', expand=True)[m
+[32m+[m[41m            [m
+[32m+[m[32m            if len(coords.columns) >= 2:[m
+[32m+[m[32m                # Получаем оба числа[m
+[32m+[m[32m                num1 = pd.to_numeric(coords[0], errors='coerce')[m
+[32m+[m[32m                num2 = pd.to_numeric(coords[1], errors='coerce')[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Создаем колонки для координат[m
+[32m+[m[32m                df['lat'] = None[m
+[32m+[m[32m                df['lon'] = None[m
+[32m+[m[41m                [m
+[32m+[m[32m                valid_count = 0[m
+[32m+[m[32m                invalid_count = 0[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Проверяем каждую строку отдельно[m
+[32m+[m[32m                for idx in df.index:[m
+[32m+[m[32m                    if pd.isna(num1[idx]) or pd.isna(num2[idx]):[m
+[32m+[m[32m                        invalid_count += 1[m
+[32m+[m[32m                        continue[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    # Пробуем вариант 1: num1 = широта, num2 = долгота[m
+[32m+[m[32m                    if (-90 <= num1[idx] <= 90) and (-180 <= num2[idx] <= 180):[m
+[32m+[m[32m                        df.at[idx, 'lat'] = num1[idx]  # широта[m
+[32m+[m[32m                        df.at[idx, 'lon'] = num2[idx]  # долгота[m
+[32m+[m[32m                        valid_count += 1[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    # Пробуем вариант 2: num1 = долгота, num2 = широта[m[41m  [m
+[32m+[m[32m                    elif (-90 <= num2[idx] <= 90) and (-180 <= num1[idx] <= 180):[m
+[32m+[m[32m                        df.at[idx, 'lat'] = num2[idx]  # широта[m
+[32m+[m[32m                        df.at[idx, 'lon'] = num1[idx]  # долгота[m
+[32m+[m[32m                        valid_count += 1[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    else:[m
+[32m+[m[32m                        invalid_count += 1[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Преобразуем в числовой формат[m
+[32m+[m[32m                df['lat'] = pd.to_numeric(df['lat'], errors='coerce')[m
+[32m+[m[32m                df['lon'] = pd.to_numeric(df['lon'], errors='coerce')[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Убираем строки с некорректными координатами[m
+[32m+[m[32m                valid_coords = df.dropna(subset=['lat', 'lon'])[m
+[32m+[m[41m                [m
+[32m+[m[32m                st.sidebar.success(f"Обработано геоточек: {valid_count}/{len(df)}")[m
+[32m+[m[41m                [m
+[32m+[m[32m                if invalid_count > 0:[m
+[32m+[m[32m                    st.sidebar.warning(f"Некорректные координаты: {invalid_count} записей")[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Показываем примеры обработанных координат[m
+[32m+[m[32m                if not valid_coords.empty:[m
+[32m+[m[32m                    with st.sidebar.expander("📍 Примеры координат"):[m
+[32m+[m[32m                        sample = valid_coords[['геоточка', 'lat', 'lon']].head(3)[m
+[32m+[m[32m                        for _, row in sample.iterrows():[m
+[32m+[m[32m                            st.write(f"{row['геоточка']} → lat:{row['lat']:.6f}, lon:{row['lon']:.6f}")[m
+[32m+[m[41m                [m
+[32m+[m[32m        except Exception as e:[m
+[32m+[m[32m            st.sidebar.error(f"Ошибка обработки геоданных: {e}")[m
+[32m+[m[41m    [m
+[32m+[m[32m    return df[m
+[32m+[m
+[32m+[m[32mdef improve_cause_analysis(df):[m
+[32m+[m[32m    """Улучшенный анализ причин пожаров"""[m
+[32m+[m[32m    # Ищем колонки, которые могут содержать информацию о причинах[m
+[32m+[m[32m    cause_columns = [][m
+[32m+[m[32m    for col in df.columns:[m
+[32m+[m[32m        if any(keyword in col.lower() for keyword in ['причина', 'cause', 'reason']):[m
+[32m+[m[32m            cause_columns.append(col)[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Если нашли колонки с причинами, объединяем их[m
+[32m+[m[32m    if cause_columns:[m
+[32m+[m[32m        st.sidebar.info(f"Найдены колонки с причинами: {cause_columns}")[m
+[32m+[m[41m        [m
+[32m+[m[32m        # Создаем объединенную колонку причин[m
+[32m+[m[32m        causes_combined = [][m
+[32m+[m[32m        for idx, row in df.iterrows():[m
+[32m+[m[32m            causes = [][m
+[32m+[m[32m            for col in cause_columns:[m
+[32m+[m[32m                if pd.notna(row[col]) and str(row[col]).strip() not in ['', 'nan', 'None']:[m
+[32m+[m[32m                    causes.append(str(row[col]).strip())[m
+[32m+[m[41m            [m
+[32m+[m[32m            if causes:[m
+[32m+[m[32m                causes_combined.append('; '.join(causes))[m
+[32m+[m[32m            else:[m
+[32m+[m[32m                causes_combined.append('Не указана')[m
+[32m+[m[41m        [m
+[32m+[m[32m        df['причина_объединенная'] = causes_combined[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        # Если нет специальных колонок, ищем в других текстовых колонках[m
+[32m+[m[32m        df['причина_объединенная'] = 'Не указана'[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Очистка и категоризация причин[m
+[32m+[m[32m    df['причина_очищенная'] = df['причина_объединенная'].apply(clean_and_categorize_cause)[m
+[32m+[m[41m    [m
+[32m+[m[32m    return df[m
+[32m+[m
+[32m+[m[32mdef clean_and_categorize_cause(cause_text):[m
+[32m+[m[32m    """Очистка и категоризация причин пожаров"""[m
+[32m+[m[32m    if pd.isna(cause_text) or cause_text in ['', 'nan', 'None', 'Не указана']:[m
+[32m+[m[32m        return 'Причина не указана'[m
+[32m+[m[41m    [m
+[32m+[m[32m    text = str(cause_text).lower().strip()[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Категоризация причин[m
+[32m+[m[32m    cause_patterns = {[m
+[32m+[m[32m        'Электрооборудование': [[m
+[32m+[m[32m            'электр', 'проводка', 'короткое замыкание', 'электрич', 'розетка',[m[41m [m
+[32m+[m[32m            'выключатель', 'сеть', 'напряжение', 'эл.', 'эл.оборудование'[m
+[32m+[m[32m        ],[m
+[32m+[m[32m        'Неосторожное обращение с огнем': [[m
+[32m+[m[32m            'неосторож', 'курение', 'спички', 'зажигалка', 'огонь', 'костер',[m
+[32m+[m[32m            'поджог', 'умышлен', 'детская шалость'[m
+[32m+[m[32m        ],[m
+[32m+[m[32m        'Бытовая техника': [[m
+[32m+[m[32m            'телевизор', 'холодильник', 'чайник', 'утюг', 'микроволновка',[m
+[32m+[m[32m            'обогреватель', 'отопление', 'печь', 'камин'[m
+[32m+[m[32m        ],[m
+[32m+[m[32m        'Природные причины': [[m
+[32m+[m[32m            'молния', 'гроза', 'солнце', 'засуха', 'природн', 'самовозгорание'[m
+[32m+[m[32m        ],[m
+[32m+[m[32m        'Техногенные причины': [[m
+[32m+[m[32m            'производств', 'техник', 'оборудование', 'автомобиль', 'транспорт',[m
+[32m+[m[32m            'газ', 'топливо', 'химич', 'горюч'[m
+[32m+[m[32m        ],[m
+[32m+[m[32m        'Строительные причины': [[m
+[32m+[m[32m            'ремонт', 'строительств', 'сварка', 'отделк', 'покраска'[m
+[32m+[m[32m        ],[m
+[32m+[m[32m        'Нарушение правил пожарной безопасности': [[m
+[32m+[m[32m            'нарушение', 'правила', 'пожарная безопасность', 'ппб', 'нормы'[m
+[32m+[m[32m        ][m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Проверяем категории[m
+[32m+[m[32m    for category, patterns in cause_patterns.items():[m
+[32m+[m[32m        for pattern in patterns:[m
+[32m+[m[32m            if pattern in text:[m
+[32m+[m[32m                return category[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Если не нашли категорию, но текст не пустой[m
+[32m+[m[32m    if len(text) > 10 and text not in ['не указана', 'нет', 'не установлена']:[m
+[32m+[m[32m        return 'Другие причины'[m
+[32m+[m[41m    [m
+[32m+[m[32m    return 'Причина не указана'[m
+[32m+[m
+[32m+[m[32m# ФУНКЦИИ АНАЛИЗА - ОПРЕДЕЛЕНЫ ПЕРЕД ИСПОЛЬЗОВАНИЕМ[m
+[32m+[m[32mdef analyze_fire_trends(df):[m
+[32m+[m[32m    """Анализ динамики пожаров по годам"""[m
+[32m+[m[32m    st.subheader("1. Динамика количества пожаров по годам")[m
+[32m+[m[41m    [m
+[32m+[m[32m    if 'год' in df.columns:[m
+[32m+[m[32m        # Собираем все показатели[m
+[32m+[m[32m        yearly_data = df.groupby('год').agg({[m
+[32m+[m[32m            'количество_пожаров': 'count',[m
+[32m+[m[32m            'всего_погибло': 'sum',[m
+[32m+[m[32m            'всего_травмы': 'sum',[m
+[32m+[m[32m            'погибло_детей': 'sum',[m
+[32m+[m[32m            'травмы_детей': 'sum'[m
+[32m+[m[32m        }).reset_index()[m
+[32m+[m[41m        [m
+[32m+[m[32m        if not yearly_data.empty:[m
+[32m+[m[32m            col1, col2 = st.columns(2)[m
+[32m+[m[41m            [m
+[32m+[m[32m            with col1:[m
+[32m+[m[32m                create_chart(yearly_data, 'line', x='год', y='количество_пожаров',[m[41m [m
+[32m+[m[32m                            title='Динамика количества пожаров по годам')[m
+[32m+[m[41m            [m
+[32m+[m[32m            with col2:[m
+[32m+[m[32m                # Показываем метрики[m
+[32m+[m[32m                if len(yearly_data) > 1:[m
+[32m+[m[32m                    last_year = yearly_data.iloc[-1][m
+[32m+[m[32m                    prev_year = yearly_data.iloc[-2][m
+[32m+[m[41m                    [m
+[32m+[m[32m                    col1, col2, col3, col4 = st.columns(4)[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    with col1:[m
+[32m+[m[32m                        delta_fires = last_year['количество_пожаров'] - prev_year['количество_пожаров'][m
+[32m+[m[32m                        st.metric("Пожары", f"{last_year['количество_пожаров']:.0f}",[m[41m [m
+[32m+[m[32m                                 f"{delta_fires:+.0f}")[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    with col2:[m
+[32m+[m[32m                        delta_deaths = last_year['всего_погибло'] - prev_year['всего_погибло'][m
+[32m+[m[32m                        st.metric("Всего погибших", f"{last_year['всего_погибло']:.0f}",[m[41m [m
+[32m+[m[32m                                 f"{delta_deaths:+.0f}")[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    with col3:[m
+[32m+[m[32m                        delta_injuries = last_year['всего_травмы'] - prev_year['всего_травмы'][m
+[32m+[m[32m                        st.metric("Всего пострадавших", f"{last_year['всего_травмы']:.0f}",[m[41m [m
+[32m+[m[32m                                 f"{delta_injuries:+.0f}")[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    with col4:[m
+[32m+[m[32m                        delta_children = (last_year['погибло_детей'] + last_year['травмы_детей']) - \[m
+[32m+[m[32m                                       (prev_year['погибло_детей'] + prev_year['травмы_детей'])[m
+[32m+[m[32m                        st.metric("Пострадало детей",[m[41m [m
+[32m+[m[32m                                 f"{(last_year['погибло_детей'] + last_year['травмы_детей']):.0f}",[m[41m [m
+[32m+[m[32m                                 f"{delta_children:+.0f}")[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Детальная статистика по жертвам[m
+[32m+[m[32m                with st.expander("📊 Детальная статистика по погибшим и пострадавшим"):[m
+[32m+[m[32m                    if len(yearly_data) > 0:[m
+[32m+[m[32m                        current_year = yearly_data.iloc[-1][m
+[32m+[m[32m                        st.write(f"**За {current_year['год']} год:**")[m
+[32m+[m[32m                        col1, col2, col3, col4 = st.columns(4)[m
+[32m+[m[32m                        col1.metric("Всего погибших", f"{current_year['всего_погибло']:.0f}")[m
+[32m+[m[32m                        col2.metric("в т.ч. детей", f"{current_year['погибло_детей']:.0f}")[m
+[32m+[m[32m                        col3.metric("Всего пострадавших", f"{current_year['всего_травмы']:.0f}")[m
+[32m+[m[32m                        col4.metric("в т.ч. детей", f"{current_year['травмы_детей']:.0f}")[m
+[32m+[m[41m            [m
+[32m+[m[32m            # График погибших и пострадавших[m
+[32m+[m[32m            if yearly_data['всего_погибло'].sum() > 0 or yearly_data['всего_травмы'].sum() > 0:[m
+[32m+[m[32m                fig = px.line(yearly_data, x='год', y=['всего_погибло', 'всего_травмы'],[m
+[32m+[m[32m                            title='Динамика погибших и пострадавших',[m
+[32m+[m[32m                            labels={'value': 'Количество людей', 'variable': 'Показатель'})[m
+[32m+[m[32m                fig.update_traces(line=dict(width=3))[m
+[32m+[m[32m                st.plotly_chart(fig, use_container_width=True)[m
+[32m+[m[41m                [m
+[32m+[m[32m        else:[m
+[32m+[m[32m            st.info("Нет данных для анализа динамики")[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        st.info("Отсутствует колонка с годом для анализа динамики")[m
+[32m+[m
+[32m+[m[32mdef analyze_district_map(df):[m
+[32m+[m[32m    """Отображение пожаров на карте с использованием реальных геоточек"""[m
+[32m+[m[32m    st.subheader("2.2 Распределение пожаров по районам на карте")[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Проверяем наличие координат[m
+[32m+[m[32m    if 'lat' in df.columns and 'lon' in df.columns:[m
+[32m+[m[32m        # Фильтруем только корректные координаты[m
+[32m+[m[32m        map_data = df.dropna(subset=['lat', 'lon']).copy()[m
+[32m+[m[41m        [m
+[32m+[m[32m        # Дополнительная проверка на валидность координат[m
+[32m+[m[32m        map_data = map_data[[m
+[32m+[m[32m            (map_data['lat'] >= -90) & (map_data['lat'] <= 90) &[m
+[32m+[m[32m            (map_data['lon'] >= -180) & (map_data['lon'] <= 180)[m
+[32m+[m[32m        ][m
+[32m+[m[41m        [m
+[32m+[m[32m        if map_data.empty:[m
+[32m+[m[32m            st.warning("Нет данных с корректными координатами для построения карты")[m
+[32m+[m[32m            return[m
+[32m+[m[41m        [m
+[32m+[m[32m        st.info(f"Отображается {len(map_data)} точек из {len(df)} записей")[m
+[32m+[m[41m        [m
+[32m+[m[32m        # Агрегируем данные для карты (группируем по координатам)[m
+[32m+[m[32m        if 'район' in df.columns:[m
+[32m+[m[32m            aggregated_data = map_data.groupby(['район', 'lat', 'lon']).agg({[m
+[32m+[m[32m                'количество_пожаров': 'count',[m
+[32m+[m[32m                'погибло': 'sum',[m
+[32m+[m[32m                'травмы': 'sum',[m
+[32m+[m[32m                'погибло_детей': 'sum',[m
+[32m+[m[32m                'травмы_детей': 'sum'[m
+[32m+[m[32m            }).reset_index()[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            aggregated_data = map_data.groupby(['lat', 'lon']).agg({[m
+[32m+[m[32m                'количество_пожаров': 'count',[m
+[32m+[m[32m                'погибло': 'sum',[m
+[32m+[m[32m                'травмы': 'sum',[m
+[32m+[m[32m                'погибло_детей': 'sum',[m
+[32m+[m[32m                'травмы_детей': 'sum'[m
+[32m+[m[32m            }).reset_index()[m
+[32m+[m[32m            aggregated_data['район'] = 'Не указан'[m
+[32m+[m[41m        [m
+[32m+[m[32m        if PLOTLY_AVAILABLE:[m
+[32m+[m[32m            try:[m
+[32m+[m[32m                # Создаем карту[m
+[32m+[m[32m                fig = px.scatter_mapbox([m
+[32m+[m[32m                    aggregated_data,[m
+[32m+[m[32m                    lat="lat",[m
+[32m+[m[32m                    lon="lon",[m[41m [m
+[32m+[m[32m                    size="количество_пожаров",[m
+[32m+[m[32m                    color="количество_пожаров",[m
+[32m+[m[32m                    hover_name="район",[m
+[32m+[m[32m                    hover_data={[m
+[32m+[m[32m                        'количество_пожаров': True,[m
+[32m+[m[32m                        'погибло': True,[m
+[32m+[m[32m                        'травмы': True,[m
+[32m+[m[32m                        'погибло_детей': True,[m
+[32m+[m[32m                        'травмы_детей': True,[m
+[32m+[m[32m                        'lat': False,[m
+[32m+[m[32m                        'lon': False[m
+[32m+[m[32m                    },[m
+[32m+[m[32m                    color_continuous_scale=px.colors.sequential.Reds,[m
+[32m+[m[32m                    size_max=20,[m
+[32m+[m[32m                    zoom=4,[m
+[32m+[m[32m                    title="Карта пожаров по геоточкам"[m
+[32m+[m[32m                )[m
+[32m+[m[32m                fig.update_layout(mapbox_style="open-street-map")[m
+[32m+[m[32m                fig.update_layout(margin={"r":0,"t":30,"l":0,"b":0})[m
+[32m+[m[32m                fig.update_layout(height=600)[m
+[32m+[m[32m                st.plotly_chart(fig, use_container_width=True)[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Статистика по карте[m
+[32m+[m[32m                col1, col2, col3, col4 = st.columns(4)[m
+[32m+[m[32m                with col1:[m
+[32m+[m[32m                    st.metric("Точек на карте", len(aggregated_data))[m
+[32m+[m[32m                with col2:[m
+[32m+[m[32m                    st.metric("Всего пожаров", aggregated_data['количество_пожаров'].sum())[m
+[32m+[m[32m                with col3:[m
+[32m+[m[32m                    st.metric("Погибло на карте", aggregated_data['погибло'].sum())[m
+[32m+[m[32m                with col4:[m
+[32m+[m[32m                    st.metric("Пострадало на карте", aggregated_data['травмы'].sum())[m
+[32m+[m[41m                [m
+[32m+[m[32m            except Exception as e:[m
+[32m+[m[32m                st.error(f"Не удалось создать карту: {e}")[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            st.info("Для отображения карты установите plotly: pip install plotly")[m
+[32m+[m[41m        [m
+[32m+[m[32m        # Детальная информация о геоданных[m
+[32m+[m[32m        with st.expander("📋 Детальная информация о геоданных"):[m
+[32m+[m[32m            st.write("**Статистика координат:**")[m
+[32m+[m[32m            col1, col2 = st.columns(2)[m
+[32m+[m[32m            with col1:[m
+[32m+[m[32m                st.write(f"Широта: {map_data['lat'].min():.4f} - {map_data['lat'].max():.4f}")[m
+[32m+[m[32m                st.write(f"Средняя широта: {map_data['lat'].mean():.4f}")[m
+[32m+[m[32m            with col2:[m
+[32m+[m[32m                st.write(f"Долгота: {map_data['lon'].min():.4f} - {map_data['lon'].max():.4f}")[m
+[32m+[m[32m                st.write(f"Средняя долгота: {map_data['lon'].mean():.4f}")[m
+[32m+[m[41m            [m
+[32m+[m[32m            st.write("**Пример геоданных:**")[m
+[32m+[m[32m            display_cols = ['район', 'населенный_пункт', 'lat', 'lon', 'количество_пожаров', 'погибло', 'травмы'][m
+[32m+[m[32m            display_cols = [col for col in display_cols if col in map_data.columns][m
+[32m+[m[32m            st.dataframe(map_data[display_cols].head(10), use_container_width=True)[m
+[32m+[m[41m            [m
+[32m+[m[32m    else:[m
+[32m+[m[32m        st.warning("""[m
+[32m+[m[32m        **Координаты не найдены!**[m
+[32m+[m[41m        [m
+[32m+[m[32m        Для построения карты нужна колонка 'геоточка' с данными в формате "долгота широта"[m
+[32m+[m[32m        Пример: 131.090314 60.465566[m
+[32m+[m[32m        """)[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef analyze_district_distribution(df):[m
+[32m+[m[32m    """Распределение пожаров по районам"""[m
+[32m+[m[32m    st.subheader("2.1 Рейтинг районов по количеству пожаров")[m
+[32m+[m[41m    [m
+[32m+[m[32m    if 'район' in df.columns:[m
+[32m+[m[32m        district_data = df.groupby('район').agg({[m
+[32m+[m[32m            'количество_пожаров': 'count',[m
+[32m+[m[32m            'всего_погибло': 'sum',[m
+[32m+[m[32m            'всего_травмы': 'sum',[m
+[32m+[m[32m            'погибло_детей': 'sum',[m
+[32m+[m[32m            'травмы_детей': 'sum'[m
+[32m+[m[32m        }).reset_index()[m
+[32m+[m[41m        [m
+[32m+[m[32m        district_data = district_data.sort_values('количество_пожаров', ascending=False)[m
+[32m+[m[41m        [m
+[32m+[m[32m        col1, col2 = st.columns(2)[m
+[32m+[m[41m        [m
+[32m+[m[32m        with col1:[m
+[32m+[m[32m            if not district_data.empty:[m
+[32m+[m[32m                create_chart(district_data.head(10), 'bar', x='район', y='количество_пожаров',[m
+[32m+[m[32m                            title='Топ-10 районов по количеству пожаров')[m
+[32m+[m[32m            else:[m
+[32m+[m[32m                st.info("Нет данных для построения графика")[m
+[32m+[m[41m        [m
+[32m+[m[32m        with col2:[m
+[32m+[m[32m            if not district_data.empty:[m
+[32m+[m[32m                st.write("**Рейтинг районов (первые 10):**")[m
+[32m+[m[32m                display_data = district_data.head(10).copy()[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Переименовываем колонки для красивого отображения[m
+[32m+[m[32m                display_data = display_data.rename(columns={[m
+[32m+[m[32m                    'район': 'Район',[m
+[32m+[m[32m                    'количество_пожаров': 'Пожары',[m
+[32m+[m[32m                    'всего_погибло': 'Погибло',[m
+[32m+[m[32m                    'всего_травмы': 'Пострадало'[m
+[32m+[m[32m                })[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Добавляем долю от общего количества[m
+[32m+[m[32m                total_fires = display_data['Пожары'].sum()[m
+[32m+[m[32m                display_data['Доля %'] = (display_data['Пожары'] / total_fires * 100).round(1)[m
+[32m+[m[41m                [m
+[32m+[m[32m                st.dataframe(display_data[['Район', 'Пожары', 'Погибло', 'Пострадало', 'Доля %']],[m[41m [m
+[32m+[m[32m                           use_container_width=True)[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Общая статистика[m
+[32m+[m[32m                col1, col2, col3 = st.columns(3)[m
+[32m+[m[32m                with col1:[m
+[32m+[m[32m                    st.metric("Всего районов", df['район'].nunique())[m
+[32m+[m[32m                with col2:[m
+[32m+[m[32m                    st.metric("Среднее пожаров на район",[m[41m [m
+[32m+[m[32m                             f"{district_data['количество_пожаров'].mean():.1f}")[m
+[32m+[m[32m                with col3:[m
+[32m+[m[32m                    st.metric("Всего погибших", f"{district_data['всего_погибло'].sum():.0f}")[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Детальная статистика по детям[m
+[32m+[m[32m                if (district_data['погибло_детей'].sum() > 0 or[m[41m [m
+[32m+[m[32m                    district_data['травмы_детей'].sum() > 0):[m
+[32m+[m[32m                    with st.expander("📊 Статистика по детям"):[m
+[32m+[m[32m                        col1, col2 = st.columns(2)[m
+[32m+[m[32m                        with col1:[m
+[32m+[m[32m                            st.metric("Погибло детей", f"{district_data['погибло_детей'].sum():.0f}")[m
+[32m+[m[32m                        with col2:[m
+[32m+[m[32m                            st.metric("Пострадало детей", f"{district_data['травмы_детей'].sum():.0f}")[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        st.info("Отсутствует колонка с районами")[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef analyze_causes(df):[m
+[32m+[m[32m    """Анализ причин пожаров"""[m
+[32m+[m[32m    st.subheader("3. Основные причины возникновения пожаров")[m
+[32m+[m[41m    [m
+[32m+[m[32m    if 'причина_очищенная' in df.columns:[m
+[32m+[m[32m        # Анализ очищенных причин[m
+[32m+[m[32m        causes_data = df.groupby('причина_очищенная').agg({[m
+[32m+[m[32m            'количество_пожаров': 'count',[m
+[32m+[m[32m            'всего_погибло': 'sum',[m
+[32m+[m[32m            'всего_травмы': 'sum',[m
+[32m+[m[32m            'погибло_детей': 'sum',[m
+[32m+[m[32m            'травмы_детей': 'sum'[m
+[32m+[m[32m        }).reset_index()[m
+[32m+[m[41m        [m
+[32m+[m[32m        causes_data = causes_data.sort_values('количество_пожаров', ascending=False)[m
+[32m+[m[41m        [m
+[32m+[m[32m        if not causes_data.empty:[m
+[32m+[m[32m            col1, col2 = st.columns(2)[m
+[32m+[m[41m            [m
+[32m+[m[32m            with col1:[m
+[32m+[m[32m                plot_data = causes_data.copy()[m
+[32m+[m[32m                if len(plot_data) > 1 and plot_data.iloc[0]['причина_очищенная'] == 'Причина не указана':[m
+[32m+[m[32m                    if plot_data.iloc[0]['количество_пожаров'] / plot_data['количество_пожаров'].sum() > 0.8:[m
+[32m+[m[32m                        other_causes = plot_data[plot_data['причина_очищенная'] != 'Причина не указана'][m
+[32m+[m[32m                        if not other_causes.empty:[m
+[32m+[m[32m                            plot_data = other_causes.head(7)[m
+[32m+[m[32m                            st.info("Показаны известные причины (большинство записей без указания причины)")[m
+[32m+[m[41m                [m
+[32m+[m[32m                create_chart(plot_data.head(8), 'pie', names='причина_очищенная',[m[41m [m
+[32m+[m[32m                            values='количество_пожаров', title='Распределение по причинам')[m
+[32m+[m[41m            [m
+[32m+[m[32m            with col2:[m
+[32m+[m[32m                st.write("**Статистика по причинам:**")[m
+[32m+[m[32m                display_causes = causes_data.copy()[m
+[32m+[m[32m                display_causes['доля'] = (display_causes['количество_пожаров'] / display_causes['количество_пожаров'].sum() * 100).round(1)[m
+[32m+[m[32m                display_causes = display_causes.rename(columns={[m
+[32m+[m[32m                    'причина_очищенная': 'Причина',[m
+[32m+[m[32m                    'количество_пожаров': 'Количество',[m
+[32m+[m[32m                    'всего_погибло': 'Погибло',[m
+[32m+[m[32m                    'всего_травмы': 'Пострадало',[m
+[32m+[m[32m                    'доля': 'Доля (%)'[m
+[32m+[m[32m                })[m
+[32m+[m[32m                st.dataframe(display_causes[['Причина', 'Количество', 'Погибло', 'Пострадало', 'Доля (%)']],[m[41m [m
+[32m+[m[32m                           use_container_width=True)[m
+[32m+[m[41m        [m
+[32m+[m[32m        # Анализ самых опасных причин[m
+[32m+[m[32m        if df['всего_погибло'].sum() > 0:[m
+[32m+[m[32m            st.subheader("Причины с наибольшими последствиями")[m
+[32m+[m[41m            [m
+[32m+[m[32m            dangerous_causes = df.groupby('причина_очищенная').agg({[m
+[32m+[m[32m                'количество_пожаров': 'count',[m
+[32m+[m[32m                'всего_погибло': 'sum',[m
+[32m+[m[32m                'всего_травмы': 'sum'[m
+[32m+[m[32m            }).reset_index()[m
+[32m+[m[41m            [m
+[32m+[m[32m            dangerous_causes = dangerous_causes[dangerous_causes['всего_погибло'] > 0][m
+[32m+[m[32m            dangerous_causes['смертность_%'] = (dangerous_causes['всего_погибло'] / dangerous_causes['количество_пожаров'] * 100).round(2)[m
+[32m+[m[32m            dangerous_causes['травматизм_%'] = (dangerous_causes['всего_травмы'] / dangerous_causes['количество_пожаров'] * 100).round(2)[m
+[32m+[m[41m            [m
+[32m+[m[32m            col1, col2 = st.columns(2)[m
+[32m+[m[41m            [m
+[32m+[m[32m            with col1:[m
+[32m+[m[32m                st.write("**По количеству погибших:**")[m
+[32m+[m[32m                display_deaths = dangerous_causes.sort_values('всего_погибло', ascending=False).head(5)[m
+[32m+[m[32m                display_deaths = display_deaths.rename(columns={[m
+[32m+[m[32m                    'причина_очищенная': 'Причина',[m
+[32m+[m[32m                    'количество_пожаров': 'Пожары',[m
+[32m+[m[32m                    'всего_погибло': 'Погибло',[m
+[32m+[m[32m                    'смертность_%': 'Смертность %'[m
+[32m+[m[32m                })[m
+[32m+[m[32m                st.dataframe(display_deaths[['Причина', 'Пожары', 'Погибло', 'Смертность %']],[m[41m [m
+[32m+[m[32m                           use_container_width=True)[m
+[32m+[m[41m            [m
+[32m+[m[32m            with col2:[m
+[32m+[m[32m                st.write("**По уровню смертности:**")[m
+[32m+[m[32m                high_mortality = dangerous_causes.sort_values('смертность_%', ascending=False).head(5)[m
+[32m+[m[32m                display_mortality = high_mortality.rename(columns={[m
+[32m+[m[32m                    'причина_очищенная': 'Причина',[m
+[32m+[m[32m                    'количество_пожаров': 'Пожары',[m
+[32m+[m[32m                    'всего_погибло': 'Погибло',[m
+[32m+[m[32m                    'смертность_%': 'Смертность %'[m
+[32m+[m[32m                })[m
+[32m+[m[32m                st.dataframe(display_mortality[['Причина', 'Пожары', 'Погибло', 'Смертность %']],[m[41m [m
+[32m+[m[32m                           use_container_width=True)[m
+[32m+[m[41m    [m
+[32m+[m[32m    else:[m
+[32m+[m[32m        st.info("Не удалось определить причины пожаров в данных")[m
+[32m+[m
+[32m+[m[32mdef analyze_locations(df):[m
+[32m+[m[32m    """Анализ мест возникновения"""[m
+[32m+[m[32m    st.subheader("4. Наиболее частые места возникновения пожаров")[m
+[32m+[m[41m    [m
+[32m+[m[32m    if 'объект' in df.columns:[m
+[32m+[m[32m        locations_data = df.groupby('объект').agg({[m
+[32m+[m[32m            'количество_пожаров': 'count'[m
+[32m+[m[32m        }).reset_index()[m
+[32m+[m[41m        [m
+[32m+[m[32m        locations_data = locations_data.sort_values('количество_пожаров', ascending=False)[m
+[32m+[m[41m        [m
+[32m+[m[32m        if not locations_data.empty:[m
+[32m+[m[32m            create_chart(locations_data.head(10), 'bar', x='объект', y='количество_пожаров',[m
+[32m+[m[32m                        title='Топ-10 объектов пожаров')[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            st.info("Нет данных о местах возникновения пожаров")[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        st.info("Отсутствует колонка с объектами пожаров")[m
+[32m+[m
+[32m+[m[32mdef analyze_seasonality(df):[m
+[32m+[m[32m    """Анализ сезонности"""[m
+[32m+[m[32m    st.subheader("5. Сезонность пожаров (по месяцам)")[m
+[32m+[m[41m    [m
+[32m+[m[32m    if 'месяц' in df.columns:[m
+[32m+[m[32m        monthly_data = df.groupby('месяц').agg({[m
+[32m+[m[32m            'количество_пожаров': 'count'[m
+[32m+[m[32m        }).reset_index()[m
+[32m+[m[41m        [m
+[32m+[m[32m        if not monthly_data.empty:[m
+[32m+[m[32m            # Преобразуем номера месяцев в названия[m
+[32m+[m[32m            month_names = {[m
+[32m+[m[32m                1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',[m[41m [m
+[32m+[m[32m                5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',[m
+[32m+[m[32m                9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь'[m
+[32m+[m[32m            }[m
+[32m+[m[32m            monthly_data['месяц_название'] = monthly_data['месяц'].map(month_names)[m
+[32m+[m[41m            [m
+[32m+[m[32m            create_chart(monthly_data, 'line', x='месяц_название', y='количество_пожаров',[m
+[32m+[m[32m                        title='Сезонность пожаров по месяцам')[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            st.info("Нет данных для анализа сезонности")[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        st.info("Отсутствуют данные о месяцах для анализа сезонности")[m
+[32m+[m
+[32m+[m[32mdef analyze_district_dynamics(df):[m
+[32m+[m[32m    """Динамика по районам"""[m
+[32m+[m[32m    st.subheader("6. Динамика показателей по районам")[m
+[32m+[m[41m    [m
+[32m+[m[32m    if 'район' in df.columns and 'год' in df.columns:[m
+[32m+[m[32m        available_districts = df['район'].unique()[m
+[32m+[m[32m        if len(available_districts) > 0:[m
+[32m+[m[32m            districts = st.multiselect("Выберите районы для анализа:",[m[41m [m
+[32m+[m[32m                                     available_districts,[m[41m [m
+[32m+[m[32m                                     default=available_districts[:min(3, len(available_districts))])[m
+[32m+[m[41m            [m
+[32m+[m[32m            if districts:[m
+[32m+[m[32m                filtered_data = df[df['район'].isin(districts)][m
+[32m+[m[32m                district_yearly = filtered_data.groupby(['год', 'район']).agg({[m
+[32m+[m[32m                    'количество_пожаров': 'count'[m
+[32m+[m[32m                }).reset_index()[m
+[32m+[m[41m                [m
+[32m+[m[32m                if not district_yearly.empty:[m
+[32m+[m[32m                    if PLOTLY_AVAILABLE:[m
+[32m+[m[32m                        fig = px.line(district_yearly, x='год', y='количество_пожаров',[m[41m [m
+[32m+[m[32m                                     color='район', title='Динамика пожаров по выбранным районам')[m
+[32m+[m[32m                        st.plotly_chart(fig, use_container_width=True)[m
+[32m+[m[32m                    else:[m
+[32m+[m[32m                        pivot_data = district_yearly.pivot(index='год', columns='район', values='количество_пожаров')[m
+[32m+[m[32m                        st.line_chart(pivot_data)[m
+[32m+[m[32m                else:[m
+[32m+[m[32m                    st.info("Нет данных для выбранных районов")[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            st.info("Нет данных о районах")[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        st.info("Отсутствуют данные о районах или годах для анализа динамики")[m
+[32m+[m
+[32m+[m[32mdef analyze_comparison(df):[m
+[32m+[m[32m    """Сравнение с аналогичным периодом прошлого года"""[m
+[32m+[m[32m    st.subheader("7. Сравнение с аналогичным периодом прошлого года (АППГ)")[m
+[32m+[m[41m    [m
+[32m+[m[32m    if 'год' in df.columns and 'район' in df.columns:[m
+[32m+[m[32m        current_year = df['год'].max()[m
+[32m+[m[32m        previous_year = current_year - 1[m
+[32m+[m[41m        [m
+[32m+[m[32m        current_data = df[df['год'] == current_year].groupby('район').agg({[m
+[32m+[m[32m            'количество_пожаров': 'count',[m
+[32m+[m[32m            'погибло': 'sum',[m
+[32m+[m[32m            'травмы': 'sum'[m
+[32m+[m[32m        })[m
+[32m+[m[41m        [m
+[32m+[m[32m        previous_data = df[df['год'] == previous_year].groupby('район').agg({[m
+[32m+[m[32m            'количество_пожаров': 'count',[m
+[32m+[m[32m            'погибло': 'sum',[m
+[32m+[m[32m            'травмы': 'sum'[m
+[32m+[m[32m        })[m
+[32m+[m[41m        [m
+[32m+[m[32m        if not current_data.empty and not previous_data.empty:[m
+[32m+[m[32m            comparison = pd.DataFrame({[m
+[32m+[m[32m                'текущий_год_пожары': current_data['количество_пожаров'],[m
+[32m+[m[32m                'прошлый_год_пожары': previous_data['количество_пожаров'],[m
+[32m+[m[32m                'текущий_год_погибло': current_data['погибло'],[m
+[32m+[m[32m                'прошлый_год_погибло': previous_data['погибло'],[m
+[32m+[m[32m                'текущий_год_травмы': current_data['травмы'],[m
+[32m+[m[32m                'прошлый_год_травмы': previous_data['травмы'][m
+[32m+[m[32m            }).fillna(0)[m
+[32m+[m[41m            [m
+[32m+[m[32m            comparison['изменение_пожаров'] = comparison['текущий_год_пожары'] - comparison['прошлый_год_пожары'][m
+[32m+[m[32m            comparison['изменение_пожаров_%'] = (comparison['изменение_пожаров'] / comparison['прошлый_год_пожары'] * 100).round(1)[m
+[32m+[m[32m            comparison['изменение_погибло'] = comparison['текущий_год_погибло'] - comparison['прошлый_год_погибло'][m
+[32m+[m[32m            comparison['изменение_травмы'] = comparison['текущий_год_травмы'] - comparison['прошлый_год_травмы'][m
+[32m+[m[41m            [m
+[32m+[m[32m            st.write(f"**Сравнение {current_year} года с {previous_year} годом:**")[m
+[32m+[m[41m            [m
+[32m+[m[32m            # Показываем общие итоги[m
+[32m+[m[32m            col1, col2, col3 = st.columns(3)[m
+[32m+[m[32m            with col1:[m
+[32m+[m[32m                total_fires_change = comparison['изменение_пожаров'].sum()[m
+[32m+[m[32m                st.metric("Изменение количества пожаров",[m[41m [m
+[32m+[m[32m                         f"{comparison['текущий_год_пожары'].sum():.0f}",[m
+[32m+[m[32m                         f"{total_fires_change:+.0f}")[m
+[32m+[m[32m            with col2:[m
+[32m+[m[32m                total_deaths_change = comparison['изменение_погибло'].sum()[m
+[32m+[m[32m                st.metric("Изменение количества погибших",[m
+[32m+[m[32m                         f"{comparison['текущий_год_погибло'].sum():.0f}",[m
+[32m+[m[32m                         f"{total_deaths_change:+.0f}")[m
+[32m+[m[32m            with col3:[m
+[32m+[m[32m                total_injuries_change = comparison['изменение_травмы'].sum()[m
+[32m+[m[32m                st.metric("Изменение количества пострадавших",[m
+[32m+[m[32m                         f"{comparison['текущий_год_травмы'].sum():.0f}",[m
+[32m+[m[32m                         f"{total_injuries_change:+.0f}")[m
+[32m+[m[41m            [m
+[32m+[m[32m            st.dataframe(comparison, use_container_width=True)[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            st.info("Недостаточно данных для сравнения АППГ")[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        st.info("Отсутствуют данные для сравнения АППГ")[m
+[32m+[m
+[32m+[m[32mdef predict_fire_trend(df):[m
+[32m+[m[32m    """Прогноз тенденций пожаров"""[m
+[32m+[m[32m    st.subheader("Прогноз тенденций пожаров")[m
+[32m+[m[41m    [m
+[32m+[m[32m    if 'год' in df.columns:[m
+[32m+[m[32m        yearly_stats = df.groupby('год').agg({[m
+[32m+[m[32m            'количество_пожаров': 'count'[m
+[32m+[m[32m        }).reset_index()[m
+[32m+[m[41m        [m
+[32m+[m[32m        if len(yearly_stats) > 1:[m
+[32m+[m[32m            current_year = yearly_stats.iloc[-1][m
+[32m+[m[32m            previous_year = yearly_stats.iloc[-2][m
+[32m+[m[41m            [m
+[32m+[m[32m            fires_trend = "📈 Растущая" if current_year['количество_пожаров'] > previous_year['количество_пожаров'] else "📉 Снижающаяся"[m
+[32m+[m[32m            fires_change = ((current_year['количество_пожаров'] - previous_year['количество_пожаров']) / previous_year['количество_пожаров'] * 100)[m
+[32m+[m[41m            [m
+[32m+[m[32m            col1, col2 = st.columns(2)[m
+[32m+[m[32m            with col1:[m
+[32m+[m[32m                st.metric([m
+[32m+[m[32m                    label="Тренд пожаров",[m
+[32m+[m[32m                    value=fires_trend,[m
+[32m+[m[32m                    delta=f"{fires_change:.1f}%"[m
+[32m+[m[32m                )[m
+[32m+[m[41m            [m
+[32m+[m[32m            with col2:[m
+[32m+[m[32m                # Простой прогноз[m
+[32m+[m[32m                if len(yearly_stats) > 2:[m
+[32m+[m[32m                    avg_growth = yearly_stats['количество_пожаров'].pct_change().mean()[m
+[32m+[m[32m                    next_year_pred = current_year['количество_пожаров'] * (1 + avg_growth)[m
+[32m+[m[32m                    st.metric([m
+[32m+[m[32m                        label="Прогноз на след. год",[m
+[32m+[m[32m                        value=f"{next_year_pred:.0f} пожаров",[m
+[32m+[m[32m                        delta=f"{avg_growth*100:.1f}%"[m
+[32m+[m[32m                    )[m
+         else:[m
+[31m-            growth = f'{last_gdp / first_gdp:,.2f}x'[m
+[31m-            delta_color = 'normal'[m
+[31m-[m
+[31m-        st.metric([m
+[31m-            label=f'{country} GDP',[m
+[31m-            value=f'{last_gdp:,.0f}B',[m
+[31m-            delta=growth,[m
+[31m-            delta_color=delta_color[m
+[31m-        )[m
+[32m+[m[32m            st.info("Недостаточно данных для прогноза (нужно минимум 2 года)")[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        st.info("Отсутствуют данные для прогноза")[m
+[32m+[m
+[32m+[m[32m# Основное приложение[m
+[32m+[m[32mdef main():[m
+[32m+[m[32m    st.title("🔥 Аналитический дашборд пожаров")[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Загрузка файла[m
+[32m+[m[32m    st.sidebar.header("Загрузка данных")[m
+[32m+[m[32m    uploaded_file = st.sidebar.file_uploader("Загрузите Excel файл с данными о пожарах",[m[41m [m
+[32m+[m[32m                                           type=['xlsx', 'xls'])[m
+[32m+[m[41m    [m
+[32m+[m[32m    if uploaded_file is not None:[m
+[32m+[m[32m        df = load_data(uploaded_file)[m
+[32m+[m[41m        [m
+[32m+[m[32m        if df is not None:[m
+[32m+[m[32m            st.sidebar.success(f"Данные загружены: {len(df)} записей")[m
+[32m+[m[41m            [m
+[32m+[m[32m            # Показываем информацию о данных[m
+[32m+[m[32m            with st.expander("📊 Информация о загруженных данных"):[m
+[32m+[m[32m                st.write(f"**Всего записей:** {len(df)}")[m
+[32m+[m[32m                st.write(f"**Период данных:** {df['год'].min()} - {df['год'].max()}")[m
+[32m+[m[32m                if 'район' in df.columns:[m
+[32m+[m[32m                    st.write(f"**Количество районов:** {df['район'].nunique()}")[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Информация о причинах[m
+[32m+[m[32m                if 'причина_очищенная' in df.columns:[m
+[32m+[m[32m                    cause_stats = df['причина_очищенная'].value_counts()[m
+[32m+[m[32m                    st.write("**Распределение причин:**")[m
+[32m+[m[32m                    for cause, count in cause_stats.items():[m
+[32m+[m[32m                        st.write(f"- {cause}: {count} ({count/len(df)*100:.1f}%)")[m
+[32m+[m[41m                [m
+[32m+[m[32m                st.write("**Первые 5 записей:**")[m
+[32m+[m[32m                st.dataframe(df.head(), use_container_width=True)[m
+[32m+[m[41m            [m
+[32m+[m[32m            # Аналитические разделы[m
+[32m+[m[32m            analyze_fire_trends(df)  # 1. Динамика по годам[m
+[32m+[m[32m            st.divider()[m
+[32m+[m[41m            [m
+[32m+[m[32m            analyze_district_distribution(df)  # 2.1 Рейтинг районов[m
+[32m+[m[32m            analyze_district_map(df)  # 2.2 Карта районов[m
+[32m+[m[32m            st.divider()[m
+[32m+[m[41m            [m
+[32m+[m[32m            analyze_causes(df)  # 3. Причины пожаров[m
+[32m+[m[32m            st.divider()[m
+[32m+[m[41m            [m
+[32m+[m[32m            analyze_locations(df)  # 4. Места возникновения[m
+[32m+[m[32m            st.divider()[m
+[32m+[m[41m            [m
+[32m+[m[32m            analyze_seasonality(df)  # 5. Сезонность[m
+[32m+[m[32m            st.divider()[m
+[32m+[m[41m            [m
+[32m+[m[32m            analyze_district_dynamics(df)  # 6. Динамика по районам[m
+[32m+[m[32m            st.divider()[m
+[32m+[m[41m            [m
+[32m+[m[32m            analyze_comparison(df)  # 7. Сравнение АППГ[m
+[32m+[m[32m            st.divider()[m
+[32m+[m[41m            [m
+[32m+[m[32m            predict_fire_trend(df)  # Прогноз[m
+[32m+[m[41m            [m
+[32m+[m[32m    else:[m
+[32m+[m[32m        st.info("👆 Пожалуйста, загрузите Excel файл с данными о пожарах для начала анализа")[m
+[32m+[m
+[32m+[m[32mif __name__ == "__main__":[m
+[32m+[m[32m    main()[m
+\ No newline at end of file[m
